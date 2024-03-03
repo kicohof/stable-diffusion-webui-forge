@@ -15,4 +15,18 @@ set COMMANDLINE_ARGS=
 @REM  --embeddings-dir %A1111_HOME%/embeddings ^
 @REM  --lora-dir %A1111_HOME%/models/Lora
 
+set COMMANDLINE_ARGS=%COMMANDLINE_ARGS% ^
+ --xformers ^
+ --ckpt-dir 'D:\ai\text-to-image\models\checkpoints\' ^
+ --hypernetwork-dir 'D:\ai\text-to-image\models\hypernetworks' ^
+ --embeddings-dir 'D:\ai\text-to-image\models\embeddings\' ^
+ --lora-dir 'D:\ai\text-to-image\models\loras\' ^
+ --vae-dir 'D:\ai\text-to-image\models\vae\' ^
+ --esrgan-models-path 'D:\ai\text-to-image\models\upscale_models\' ^
+ --cuda-malloc ^
+ --cuda-stream ^
+ --pin-shared-memory
+
+echo %COMMANDLINE_ARGS%
+
 call webui.bat
