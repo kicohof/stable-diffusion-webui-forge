@@ -412,47 +412,147 @@ def common_upscale(samples, width, height, upscale_method, crop):
         else:
             return torch.nn.functional.interpolate(s, size=(height, width), mode=upscale_method)
 
+
 def get_tiled_scale_steps(width, height, tile_x, tile_y, overlap):
     return math.ceil((height / (tile_y - overlap))) * math.ceil((width / (tile_x - overlap)))
 
+
 @torch.inference_mode()
-def tiled_scale(samples, function, tile_x=64, tile_y=64, overlap = 8, upscale_amount = 4, out_channels = 3, output_device="cpu", pbar = None):
-    output = torch.empty((samples.shape[0], out_channels, round(samples.shape[2] * upscale_amount), round(samples.shape[3] * upscale_amount)), device=output_device)
-    for b in range(samples.shape[0]):
-        s = samples[b:b+1]
-        out = torch.zeros((s.shape[0], out_channels, round(s.shape[2] * upscale_amount), round(s.shape[3] * upscale_amount)), device=output_device)
-        out_div = torch.zeros((s.shape[0], out_channels, round(s.shape[2] * upscale_amount), round(s.shape[3] * upscale_amount)), device=output_device)
-        for y in range(0, s.shape[2], tile_y - overlap):
-            for x in range(0, s.shape[3], tile_x - overlap):
-                x = max(0, min(s.shape[-1] - overlap, x))
-                y = max(0, min(s.shape[-2] - overlap, y))
-                s_in = s[:,:,y:y+tile_y,x:x+tile_x]
+def tiled_scale(
+        samples,
+        function,
+        tile_x=64, tile_y=64,
+        overlap=8,
+        upscale_amount=4,
+        out_channels=3,
+        output_device="cpu",
+        pbar=None
+):
 
-                ps = function(s_in).to(output_device)
-                mask = torch.ones_like(ps)
-                feather = round(overlap * upscale_amount)
-                for t in range(feather):
-                        mask[:,:,t:1+t,:] *= ((1.0/feather) * (t + 1))
-                        mask[:,:,mask.shape[2] -1 -t: mask.shape[2]-t,:] *= ((1.0/feather) * (t + 1))
-                        mask[:,:,:,t:1+t] *= ((1.0/feather) * (t + 1))
-                        mask[:,:,:,mask.shape[3]- 1 - t: mask.shape[3]- t] *= ((1.0/feather) * (t + 1))
-                out[:,:,round(y*upscale_amount):round((y+tile_y)*upscale_amount),round(x*upscale_amount):round((x+tile_x)*upscale_amount)] += ps * mask
-                out_div[:,:,round(y*upscale_amount):round((y+tile_y)*upscale_amount),round(x*upscale_amount):round((x+tile_x)*upscale_amount)] += mask
-                if pbar is not None:
-                    pbar.update(1)
+    first_sample_shape = samples.shape[0]
+    output = torch.empty(
+        (first_sample_shape,
+         out_channels,
+         round(samples.shape[2] * upscale_amount),
+         round(samples.shape[3] * upscale_amount)),
+        device=output_device)
 
-        output[b:b+1] = out/out_div
+    [tiled_scale_step(
+        b, function,
+        out_channels,
+        output, output_device,
+        overlap, pbar,
+        samples, tile_x, tile_y,
+        upscale_amount) for b in range(first_sample_shape)]
+
     return output
 
+
+def tiled_scale_step(
+        b, function,
+        out_channels, output, output_device,
+        overlap, pbar, samples,
+        tile_x, tile_y,
+        upscale_amount
+):
+    out, out_div = tiled_scale_step_(
+        b, function,
+        out_channels, output_device,
+        overlap,
+        pbar,
+        samples,
+        tile_x, tile_y,
+        upscale_amount
+    )
+    output[b:b + 1] = out / out_div
+    pass
+
+
+def tiled_scale_step_(
+        b, function,
+        out_channels, output_device,
+        overlap, pbar, samples,
+        tile_x, tile_y,
+        upscale_amount
+):
+
+    sample = samples[b:b + 1]
+    first_sample_shape = sample.shape[0]
+    third_sample_shape = sample.shape[2]
+    fourth_sample_shape = sample.shape[3]
+
+    third_sample_shape_upscale = round(third_sample_shape * upscale_amount)
+    fourth_sample_shape_upscale = round(fourth_sample_shape * upscale_amount)
+    out = torch.zeros(
+        (first_sample_shape, out_channels, third_sample_shape_upscale, fourth_sample_shape_upscale),
+        device=output_device)
+
+    out_div = torch.zeros(
+        (first_sample_shape, out_channels, third_sample_shape_upscale, fourth_sample_shape_upscale),
+        device=output_device)
+
+    y_range = range(0, third_sample_shape, tile_y - overlap)
+    x_range = range(0, fourth_sample_shape, tile_x - overlap)
+    [scale_step(
+        function,
+        out, out_div, output_device,
+        overlap,
+        pbar,
+        sample,
+        tile_x, tile_y,
+        upscale_amount,
+        x, y) for y in y_range for x in x_range]
+
+    return out, out_div
+
+
+def scale_step(function, out, out_div, output_device, overlap, pbar, sample, tile_x, tile_y, upscale_amount, x, y):
+
+    x = max(0, min(sample.shape[-1] - overlap, x))
+    y = max(0, min(sample.shape[-2] - overlap, y))
+    s_in = sample[:, :, y:y + tile_y, x:x + tile_x]
+    ps = function(s_in).to(output_device)
+    mask = torch.ones_like(ps)
+    feather = round(overlap * upscale_amount)
+
+    [mask_step(feather, mask, t) for t in range(feather)]
+
+    y_scale = round(y * upscale_amount)
+    y_tile_scale = round((y + tile_y) * upscale_amount)
+    x_scale = round(x * upscale_amount)
+    x_tile_scale = round((x + tile_x) * upscale_amount)
+    out[:, :, y_scale:y_tile_scale, x_scale:x_tile_scale] += ps * mask
+    out_div[:, :, y_scale:y_tile_scale, x_scale:x_tile_scale] += mask
+
+    if pbar is not None:
+        pbar.update(1)
+
+    pass
+
+
+def mask_step(feather, mask, t):
+    mask[:, :, t:1 + t, :] *= ((1.0 / feather) * (t + 1))
+    mask[:, :, mask.shape[2] - 1 - t: mask.shape[2] - t, :] *= ((1.0 / feather) * (t + 1))
+    mask[:, :, :, t:1 + t] *= ((1.0 / feather) * (t + 1))
+    mask[:, :, :, mask.shape[3] - 1 - t: mask.shape[3] - t] *= ((1.0 / feather) * (t + 1))
+    pass
+
+
 PROGRESS_BAR_ENABLED = True
+
+
 def set_progress_bar_enabled(enabled):
     global PROGRESS_BAR_ENABLED
     PROGRESS_BAR_ENABLED = enabled
 
+
 PROGRESS_BAR_HOOK = None
+
+
 def set_progress_bar_global_hook(function):
     global PROGRESS_BAR_HOOK
     PROGRESS_BAR_HOOK = function
+
 
 class ProgressBar:
     def __init__(self, total, title=None):
