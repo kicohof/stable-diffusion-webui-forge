@@ -20,7 +20,7 @@ from . import clip_vision
 from . import model_detection
 from . import diffusers_convert
 from ldm_patched.modules import model_management
-from ldm_patched.modules.utils import get_tiled_scale_steps
+from ldm_patched.modules.utils import get_tiled_scale_steps, tiled_scale
 from ldm_patched.ldm.models.autoencoder import AutoencoderKL, AutoencodingEngine
 
 
@@ -243,17 +243,17 @@ class VAE:
 
         decode_fn = lambda a: (self.first_stage_model.decode(a.to(self.vae_dtype).to(self.device)) + 1.0).float()
         output = torch.clamp((
-            (ldm_patched.modules.utils.tiled_scale(
+            (tiled_scale(
                 samples, decode_fn, tile_x // 2, tile_y * 2, overlap,
                 upscale_amount=self.downscale_ratio,
                 output_device=self.output_device,
                 pbar=pbar) +
-             ldm_patched.modules.utils.tiled_scale(
+             tiled_scale(
                 samples, decode_fn, tile_x * 2, tile_y // 2, overlap,
                 upscale_amount=self.downscale_ratio,
                 output_device=self.output_device,
                 pbar=pbar) +
-             ldm_patched.modules.utils.tiled_scale(
+             tiled_scale(
                  samples, decode_fn, tile_x, tile_y, overlap,
                  upscale_amount=self.downscale_ratio,
                  output_device=self.output_device,
