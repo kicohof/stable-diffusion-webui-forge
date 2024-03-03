@@ -232,12 +232,15 @@ class VAE:
         return n
 
     def decode_tiled_(self, samples, tile_x=64, tile_y=64, overlap=16):
-        steps = samples.shape[0] * ldm_patched.modules.utils.get_tiled_scale_steps(
-            samples.shape[3], samples.shape[2], tile_x, tile_y, overlap)
-        steps += samples.shape[0] * ldm_patched.modules.utils.get_tiled_scale_steps(
-            samples.shape[3], samples.shape[2], tile_x // 2, tile_y * 2, overlap)
-        steps += samples.shape[0] * ldm_patched.modules.utils.get_tiled_scale_steps(
-            samples.shape[3], samples.shape[2], tile_x * 2, tile_y // 2, overlap)
+        first_sample_shape = samples.shape[0]
+        third_sample_shape = samples.shape[2]
+        fourth_sample_shape = samples.shape[3]
+        steps = first_sample_shape * get_tiled_scale_steps(
+            fourth_sample_shape, third_sample_shape, tile_x, tile_y, overlap)
+        steps += first_sample_shape * get_tiled_scale_steps(
+            fourth_sample_shape, third_sample_shape, tile_x // 2, tile_y * 2, overlap)
+        steps += first_sample_shape * get_tiled_scale_steps(
+            fourth_sample_shape, third_sample_shape, tile_x * 2, tile_y // 2, overlap)
         pbar = ldm_patched.modules.utils.ProgressBar(steps, title='VAE tiled decode')
 
         decode_fn = lambda a: (self.first_stage_model.decode(a.to(self.vae_dtype).to(self.device)) + 1.0).float()
