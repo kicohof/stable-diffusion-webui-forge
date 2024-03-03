@@ -2,29 +2,27 @@
 # This file is only for reference, and not used in the backend or runtime.
 
 
-import torch
-
-from ldm_patched.modules import model_management
-from ldm_patched.ldm.models.autoencoder import AutoencoderKL, AutoencodingEngine
 import yaml
-
+import torch
+import ldm_patched.taesd.taesd
+import ldm_patched.t2ia.adapter
+import ldm_patched.modules.lora
 import ldm_patched.modules.utils
+import ldm_patched.modules.model_patcher
+import ldm_patched.modules.supported_models_base
 
-from . import clip_vision
 from . import gligen
-from . import diffusers_convert
-from . import model_base
-from . import model_detection
-
 from . import sd1_clip
 from . import sd2_clip
 from . import sdxl_clip
+from . import model_base
+from . import clip_vision
+from . import model_detection
+from . import diffusers_convert
+from ldm_patched.modules import model_management
+from ldm_patched.modules.utils import get_tiled_scale_steps
+from ldm_patched.ldm.models.autoencoder import AutoencoderKL, AutoencodingEngine
 
-import ldm_patched.modules.model_patcher
-import ldm_patched.modules.lora
-import ldm_patched.t2ia.adapter
-import ldm_patched.modules.supported_models_base
-import ldm_patched.taesd.taesd
 
 def load_model_weights(model, sd):
     m, u = model.load_state_dict(sd, strict=False)
