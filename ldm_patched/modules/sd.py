@@ -230,34 +230,40 @@ class VAE:
         return n
 
     def decode_tiled_(self, samples, tile_x=64, tile_y=64, overlap=16):
+
         first_sample_shape = samples.shape[0]
         third_sample_shape = samples.shape[2]
         fourth_sample_shape = samples.shape[3]
+
         steps = first_sample_shape * get_tiled_scale_steps(
             fourth_sample_shape, third_sample_shape, tile_x, tile_y, overlap)
         steps += first_sample_shape * get_tiled_scale_steps(
             fourth_sample_shape, third_sample_shape, tile_x // 2, tile_y * 2, overlap)
         steps += first_sample_shape * get_tiled_scale_steps(
             fourth_sample_shape, third_sample_shape, tile_x * 2, tile_y // 2, overlap)
+
         pbar = ldm_patched.modules.utils.ProgressBar(steps, title='VAE tiled decode')
 
-        decode_fn = lambda a: (self.first_stage_model.decode(a.to(self.vae_dtype).to(self.device)) + 1.0).float()
-        output = torch.clamp((
-            (tiled_scale(
-                samples, decode_fn, tile_x // 2, tile_y * 2, overlap,
-                upscale_amount=self.downscale_ratio,
-                output_device=self.output_device,
-                pbar=pbar) +
-             tiled_scale(
-                samples, decode_fn, tile_x * 2, tile_y // 2, overlap,
-                upscale_amount=self.downscale_ratio,
-                output_device=self.output_device,
-                pbar=pbar) +
-             tiled_scale(
-                 samples, decode_fn, tile_x, tile_y, overlap,
-                 upscale_amount=self.downscale_ratio,
-                 output_device=self.output_device,
-                 pbar=pbar)) / 3.0) / 2.0, min=0.0, max=1.0)
+        def decode_function(a):
+            model = self.first_stage_model
+            decode_result = model.decode(a.to(self.vae_dtype).to(self.device))
+            return (decode_result + 1.0).float()
+
+        tiled_scale_part_1 = tiled_scale(
+            samples, decode_function, tile_x // 2, tile_y * 2, overlap,
+            upscale_amount=self.downscale_ratio, output_device=self.output_device, pbar=pbar)
+
+        tiled_scale_part_2 = tiled_scale(
+            samples, decode_function, tile_x * 2, tile_y // 2, overlap,
+            upscale_amount=self.downscale_ratio, output_device=self.output_device, pbar=pbar)
+
+        tiled_scale_part_3 = tiled_scale(
+            samples, decode_function, tile_x, tile_y, overlap,
+            upscale_amount=self.downscale_ratio, output_device=self.output_device, pbar=pbar)
+
+        tensor = ((tiled_scale_part_1 + tiled_scale_part_2 + tiled_scale_part_3) / 3.0) / 2.0
+
+        output = torch.clamp(input=tensor, min=0.0, max=1.0)
 
         return output
 
