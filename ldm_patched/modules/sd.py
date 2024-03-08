@@ -169,6 +169,7 @@ class CLIP:
 
 
 class VAE:
+
     def __init__(self, sd=None, device=None, config=None, dtype=None, no_init=False):
         if no_init:
             return
@@ -176,8 +177,9 @@ class VAE:
         if 'decoder.up_blocks.0.resnets.0.norm1.weight' in sd.keys():  # diffusers format
             sd = diffusers_convert.convert_vae_state_dict(sd)
 
-        self.memory_used_encode = lambda shape, dtype: (1767 * shape[2] * shape[3]) * model_management.dtype_size(dtype) #These are for AutoencoderKL and need tweaking (should be lower)
-        self.memory_used_decode = lambda shape, dtype: (2178 * shape[2] * shape[3] * 64) * model_management.dtype_size(dtype)
+        # These are for AutoencoderKL and need tweaking (should be lowered)
+        self.memory_used_encode = self.memory_used_encode_func
+        self.memory_used_decode = self.memory_used_decode_func
         self.downscale_ratio = 8
         self.latent_channels = 4
 
@@ -237,6 +239,13 @@ class VAE:
         n.output_device = self.output_device
         return n
 
+    @staticmethod
+    def memory_used_encode_func(shape, dtype):
+        return (1767 * shape[2] * shape[3]) * model_management.dtype_size(dtype)
+
+    @staticmethod
+    def memory_used_decode_func(shape, dtype):
+        return (2178 * shape[2] * shape[3] * 64) * model_management.dtype_size(dtype)
 
     @torch.inference_mode
     def decode_function(self, a):
