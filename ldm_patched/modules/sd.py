@@ -19,11 +19,16 @@ from . import model_base
 from . import clip_vision
 from . import model_detection
 from . import diffusers_convert
-from ldm_patched.modules import model_management
+from ldm_patched.modules import (
+    model_management
+)
 from ldm_patched.modules.utils import (
     ProgressBar,
     tiled_scale,
     get_tiled_scale_steps,
+)
+from ldm_patched.modules.model_patcher import (
+    ModelPatcher
 )
 from ldm_patched.ldm.models.autoencoder import (
     AutoencoderKL,
@@ -224,7 +229,11 @@ class VAE:
         self.first_stage_model.to(self.vae_dtype)
         self.output_device = model_management.intermediate_device()
 
-        self.patcher = ldm_patched.modules.model_patcher.ModelPatcher(self.first_stage_model, load_device=self.device, offload_device=offload_device)
+        self.patcher = ModelPatcher(
+            self.first_stage_model,
+            load_device=self.device,
+            offload_device=offload_device
+        )
 
     def clone(self):
         n = VAE(no_init=True)
