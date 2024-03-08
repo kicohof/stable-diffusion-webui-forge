@@ -143,8 +143,7 @@ class AutoencodingEngine(AbstractAutoencoder):
         return z
 
     def decode(self, z: torch.Tensor, **kwargs) -> torch.Tensor:
-        x = self.decoder(z, **kwargs)
-        return x
+        return self.decoder(z, **kwargs)
 
     def forward(
         self, x: torch.Tensor, **additional_decode_kwargs
