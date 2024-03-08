@@ -514,8 +514,9 @@ def scale_step(function, out, out_div, output_device, overlap, pbar, sample, til
     ps = function(s_in).to(output_device)
     mask = torch.ones_like(ps)
     feather = round(overlap * upscale_amount)
+    inverted_feather = (1.0 / feather)
 
-    [mask_step(feather, mask, t) for t in range(feather)]
+    [mask_step(inverted_feather, mask, t) for t in range(feather)]
 
     y_scale = round(y * upscale_amount)
     y_tile_scale = round((y + tile_y) * upscale_amount)
@@ -530,11 +531,17 @@ def scale_step(function, out, out_div, output_device, overlap, pbar, sample, til
     pass
 
 
-def mask_step(feather, mask, t):
-    mask[:, :, t:1 + t, :] *= ((1.0 / feather) * (t + 1))
-    mask[:, :, mask.shape[2] - 1 - t: mask.shape[2] - t, :] *= ((1.0 / feather) * (t + 1))
-    mask[:, :, :, t:1 + t] *= ((1.0 / feather) * (t + 1))
-    mask[:, :, :, mask.shape[3] - 1 - t: mask.shape[3] - t] *= ((1.0 / feather) * (t + 1))
+def mask_step(inverted_feather, mask, t):
+
+    feather_ratio = (inverted_feather * (t + 1))
+    mask_shape_three = mask.shape[2]
+    mask_shape_four = mask.shape[3]
+
+    mask[:, :, t:1 + t, :] *= feather_ratio
+    mask[:, :, mask_shape_three - 1 - t: mask_shape_three - t, :] *= feather_ratio
+    mask[:, :, :, t:1 + t] *= feather_ratio
+    mask[:, :, :, mask_shape_four - 1 - t: mask_shape_four - t] *= feather_ratio
+
     pass
 
 
