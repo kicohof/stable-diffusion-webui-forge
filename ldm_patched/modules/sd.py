@@ -250,7 +250,7 @@ class VAE:
         steps += first_sample_shape * get_tiled_scale_steps(
             fourth_sample_shape, third_sample_shape, tile_x * 2, tile_y // 2, overlap)
 
-        pbar = ldm_patched.modules.utils.ProgressBar(steps, title='VAE tiled decode')
+        pbar = ProgressBar(steps, title='VAE tiled decode')
 
         def decode_function(a):
             model = self.first_stage_model
