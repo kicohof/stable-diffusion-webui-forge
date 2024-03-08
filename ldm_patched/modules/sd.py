@@ -237,6 +237,13 @@ class VAE:
         n.output_device = self.output_device
         return n
 
+
+    @torch.inference_mode
+    def decode_function(self, a):
+        a_tensor = a.to(self.vae_dtype).to(self.device)
+        return (self.first_stage_model.decode(a_tensor) + 1.0).float()
+
+    @torch.inference_mode
     def decode_tiled_(self, samples, tile_x=64, tile_y=64, overlap=16):
 
         first_sample_shape = samples.shape[0]
@@ -252,21 +259,16 @@ class VAE:
 
         pbar = ProgressBar(steps, title='VAE tiled decode')
 
-        def decode_function(a):
-            model = self.first_stage_model
-            decode_result = model.decode(a.to(self.vae_dtype).to(self.device))
-            return (decode_result + 1.0).float()
-
         tiled_scale_part_1 = tiled_scale(
-            samples, decode_function, tile_x // 2, tile_y * 2, overlap,
+            samples, self.decode_function, tile_x // 2, tile_y * 2, overlap,
             upscale_amount=self.downscale_ratio, output_device=self.output_device, pbar=pbar)
 
         tiled_scale_part_2 = tiled_scale(
-            samples, decode_function, tile_x * 2, tile_y // 2, overlap,
+            samples, self.decode_function, tile_x * 2, tile_y // 2, overlap,
             upscale_amount=self.downscale_ratio, output_device=self.output_device, pbar=pbar)
 
         tiled_scale_part_3 = tiled_scale(
-            samples, decode_function, tile_x, tile_y, overlap,
+            samples, self.decode_function, tile_x, tile_y, overlap,
             upscale_amount=self.downscale_ratio, output_device=self.output_device, pbar=pbar)
 
         tensor = ((tiled_scale_part_1 + tiled_scale_part_2 + tiled_scale_part_3) / 3.0) / 2.0
