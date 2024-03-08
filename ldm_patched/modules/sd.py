@@ -20,8 +20,15 @@ from . import clip_vision
 from . import model_detection
 from . import diffusers_convert
 from ldm_patched.modules import model_management
-from ldm_patched.modules.utils import get_tiled_scale_steps, tiled_scale
-from ldm_patched.ldm.models.autoencoder import AutoencoderKL, AutoencodingEngine
+from ldm_patched.modules.utils import (
+    ProgressBar,
+    tiled_scale,
+    get_tiled_scale_steps,
+)
+from ldm_patched.ldm.models.autoencoder import (
+    AutoencoderKL,
+    AutoencodingEngine
+)
 
 
 def load_model_weights(model, sd):
