@@ -190,7 +190,7 @@ class VAE:
 
         if config is None:
             if "decoder.mid.block_1.mix_factor" in sd:
-                encoder_config = {'double_z': True, 'z_channels': 4, 'resolution': 256, 'in_channels': 3, 'out_ch': 3, 'ch': 128, 'ch_mult': [1, 2, 4, 4], 'num_res_blocks': 2, 'attn_resolutions': [], 'dropout': 0.0}
+                encoder_config = self.create_config()
                 decoder_config = encoder_config.copy()
                 decoder_config["video_kernel_size"] = [3, 1, 1]
                 decoder_config["alpha"] = 0.0
@@ -200,14 +200,14 @@ class VAE:
             elif "taesd_decoder.1.weight" in sd:
                 self.first_stage_model = ldm_patched.taesd.taesd.TAESD()
             else:
-                #default SD1.x/SD2.x VAE parameters
-                ddconfig = {'double_z': True, 'z_channels': 4, 'resolution': 256, 'in_channels': 3, 'out_ch': 3, 'ch': 128, 'ch_mult': [1, 2, 4, 4], 'num_res_blocks': 2, 'attn_resolutions': [], 'dropout': 0.0}
+                # default SD1.x/SD2.x VAE parameters
+                dd_config = self.create_config()
 
-                if 'encoder.down.2.downsample.conv.weight' not in sd: #Stable diffusion x4 upscaler VAE
-                    ddconfig['ch_mult'] = [1, 2, 4]
+                if 'encoder.down.2.downsample.conv.weight' not in sd:  # Stable diffusion x4 upscaler VAE
+                    dd_config['ch_mult'] = [1, 2, 4]
                     self.downscale_ratio = 4
 
-                self.first_stage_model = AutoencoderKL(ddconfig=ddconfig, embed_dim=4)
+                self.first_stage_model = AutoencoderKL(ddconfig=dd_config, embed_dim=4)
         else:
             self.first_stage_model = AutoencoderKL(**(config['params']))
         self.first_stage_model = self.first_stage_model.eval()
@@ -234,6 +234,21 @@ class VAE:
             load_device=self.device,
             offload_device=offload_device
         )
+
+    @staticmethod
+    def create_config():
+        return {
+            'double_z': True,
+            'z_channels': 4,
+            'resolution': 256,
+            'in_channels': 3,
+            'out_ch': 3,
+            'ch': 128,
+            'ch_mult': [1, 2, 4, 4],
+            'num_res_blocks': 2,
+            'attn_resolutions': [],
+            'dropout': 0.0
+        }
 
     def clone(self):
         n = VAE(no_init=True)
