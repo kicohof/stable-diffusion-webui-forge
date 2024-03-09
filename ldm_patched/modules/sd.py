@@ -279,17 +279,11 @@ class VAE:
     @torch.inference_mode
     def decode_tiled_(self, samples, tile_x=64, tile_y=64, overlap=16):
 
-        first_sample_shape = samples.shape[0]
-        third_sample_shape = samples.shape[2]
-        fourth_sample_shape = samples.shape[3]
-
-        steps = first_sample_shape * get_tiled_scale_steps(
-            fourth_sample_shape, third_sample_shape, tile_x, tile_y, overlap)
-        steps += first_sample_shape * get_tiled_scale_steps(
-            fourth_sample_shape, third_sample_shape, tile_x // 2, tile_y * 2, overlap)
-        steps += first_sample_shape * get_tiled_scale_steps(
-            fourth_sample_shape, third_sample_shape, tile_x * 2, tile_y // 2, overlap)
-
+        sample_shape_0, sample_shape_2, sample_shape_3 = samples.shape[0], samples.shape[2], samples.shape[3]
+        steps_part1 = get_tiled_scale_steps(sample_shape_3, sample_shape_2, tile_x, tile_y, overlap)
+        steps_part2 = get_tiled_scale_steps(sample_shape_3, sample_shape_2, tile_x // 2, tile_y * 2, overlap)
+        steps_part3 = get_tiled_scale_steps(sample_shape_3, sample_shape_2, tile_x * 2, tile_y // 2, overlap)
+        steps = sample_shape_0 * (steps_part1 + steps_part2 + steps_part3)
         pbar = ProgressBar(steps, title='VAE tiled decode')
 
         tiled_scale_part_1 = tiled_scale(
@@ -305,10 +299,7 @@ class VAE:
             upscale_amount=self.downscale_ratio, output_device=self.output_device, pbar=pbar)
 
         tensor = ((tiled_scale_part_1 + tiled_scale_part_2 + tiled_scale_part_3) / 3.0) / 2.0
-
-        output = torch.clamp(input=tensor, min=0.0, max=1.0)
-
-        return output
+        return torch.clamp(input=tensor, min=0.0, max=1.0)
 
     def encode_tiled_(self, pixel_samples, tile_x=512, tile_y=512, overlap = 64):
         steps = pixel_samples.shape[0] * ldm_patched.modules.utils.get_tiled_scale_steps(pixel_samples.shape[3], pixel_samples.shape[2], tile_x, tile_y, overlap)
@@ -331,8 +322,7 @@ class VAE:
             memory_used = self.memory_used_decode(samples_in.shape, self.vae_dtype)
             model_management.load_models_gpu([self.patcher], memory_required=memory_used)
             free_memory = model_management.get_free_memory(self.device)
-            batch_number = int(free_memory / memory_used)
-            batch_number = max(1, batch_number)
+            batch_number = max(1, int(free_memory / memory_used))
 
             pixel_samples = torch.empty((
                 samples_in.shape[0], 3,
@@ -341,14 +331,14 @@ class VAE:
                 device=self.output_device
             )
 
-            [self.f(batch_number, pixel_samples, samples_in, x) for x in range(0, samples_in.shape[0], batch_number)]
+            [self.f(batch_number, pixel_samples, samples_in, x)
+             for x in range(0, samples_in.shape[0], batch_number)]
 
         except model_management.OOM_EXCEPTION:
             print("Warning: Ran out of memory when regular VAE decoding, retrying with tiled VAE decoding.")
             pixel_samples = self.decode_tiled_(samples_in)
 
-        pixel_samples = pixel_samples.to(self.output_device).movedim(1, -1)
-        return pixel_samples
+        return pixel_samples.to(self.output_device).movedim(1, -1)
 
     def f(self, batch_number, pixel_samples, samples_in, x):
         samples = samples_in[x:x + batch_number].to(self.vae_dtype).to(self.device)
@@ -362,16 +352,17 @@ class VAE:
         else:
             return wrapper(self.decode_inner, samples_in)
 
-    def decode_tiled(self, samples, tile_x=64, tile_y=64, overlap = 16):
+    def decode_tiled(self, samples, tile_x=64, tile_y=64, overlap=16):
         model_management.load_model_gpu(self.patcher)
+        # noinspection PyArgumentList
         output = self.decode_tiled_(samples, tile_x, tile_y, overlap)
-        return output.movedim(1,-1)
+        return output.movedim(1, -1)
 
     def encode_inner(self, pixel_samples):
         if model_management.VAE_ALWAYS_TILED:
             return self.encode_tiled(pixel_samples)
 
-        pixel_samples = pixel_samples.movedim(-1,1)
+        pixel_samples = pixel_samples.movedim(-1, 1)
         try:
             memory_used = self.memory_used_encode(pixel_samples.shape, self.vae_dtype)
             model_management.load_models_gpu([self.patcher], memory_required=memory_used)
