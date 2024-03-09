@@ -8,8 +8,11 @@ import struct
 import ldm_patched.modules.checkpoint_pickle
 import safetensors.torch
 import numpy as np
+
 from PIL import Image
 from tqdm import tqdm
+from dataclasses import dataclass
+
 
 def load_torch_file(ckpt, safe_load=False, device=None):
     if device is None:
@@ -415,6 +418,16 @@ def common_upscale(samples, width, height, upscale_method, crop):
 
 def get_tiled_scale_steps(width, height, tile_x, tile_y, overlap):
     return math.ceil((height / (tile_y - overlap))) * math.ceil((width / (tile_x - overlap)))
+
+
+@dataclass
+class TilingData:
+    function: object
+    tile_x: int
+    tile_y: int
+    overlap: int
+    upscale_amount: int
+    pass
 
 
 @torch.inference_mode()
