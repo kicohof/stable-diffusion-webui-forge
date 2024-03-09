@@ -558,9 +558,8 @@ def mask_step(feather_ratio, mask, t):
     mask_shape_2 = mask.shape[2]
     mask_shape_3 = mask.shape[3]
 
-    mask[:, :, t:1 + t, :] *= feather_ratio
+    mask[:, :, t:(t + 1), t:(t + 1)] *= feather_ratio
     mask[:, :, mask_shape_2 - 1 - t: mask_shape_2 - t, :] *= feather_ratio
-    mask[:, :, :, t:1 + t] *= feather_ratio
     mask[:, :, :, mask_shape_3 - 1 - t: mask_shape_3 - t] *= feather_ratio
 
     pass
