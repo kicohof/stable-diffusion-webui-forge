@@ -334,8 +334,10 @@ class VAE:
             [self.f(batch_number, pixel_samples, samples_in, x)
              for x in range(0, samples_in.shape[0], batch_number)]
 
-        except model_management.OOM_EXCEPTION:
-            print("Warning: Ran out of memory when regular VAE decoding, retrying with tiled VAE decoding.")
+        except model_management.OOM_EXCEPTION as e:
+            print("Warning: Ran out of memory when regular VAE decoding,"
+                  f" retrying with tiled VAE decoding"
+                  f"\n({repr(e)}).")
             pixel_samples = self.decode_tiled_(samples_in)
 
         return pixel_samples.to(self.output_device).movedim(1, -1)
