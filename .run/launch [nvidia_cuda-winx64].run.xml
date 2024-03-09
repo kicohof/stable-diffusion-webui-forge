@@ -1,0 +1,26 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="launch [nvidia/cuda-winx64]" type="PythonConfigurationType" factoryName="Python">
+    <module name="stable-diffusion-webui-forge" />
+    <option name="ENV_FILES" value="" />
+    <option name="INTERPRETER_OPTIONS" value="" />
+    <option name="PARENT_ENVS" value="true" />
+    <envs>
+      <env name="PYTHONUNBUFFERED" value="1" />
+      <env name="COMMANDLINE_ARGS" value="--xformers --ckpt-dir 'D:\ai\text-to-image\models\checkpoints\' --hypernetwork-dir 'D:\ai\text-to-image\models\hypernetworks' --embeddings-dir 'D:\ai\text-to-image\models\embeddings\' --lora-dir 'D:\ai\text-to-image\models\loras\' --vae-dir 'D:\ai\text-to-image\models\vae\' --esrgan-models-path 'D:\ai\text-to-image\models\upscale_models\' --cuda-malloc --cuda-stream --pin-shared-memory" />
+    </envs>
+    <option name="SDK_HOME" value="" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <option name="IS_MODULE_SDK" value="true" />
+    <option name="ADD_CONTENT_ROOTS" value="true" />
+    <option name="ADD_SOURCE_ROOTS" value="true" />
+    <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+    <option name="SCRIPT_NAME" value="$PROJECT_DIR$/launch.py" />
+    <option name="PARAMETERS" value="" />
+    <option name="SHOW_COMMAND_LINE" value="false" />
+    <option name="EMULATE_TERMINAL" value="false" />
+    <option name="MODULE_MODE" value="false" />
+    <option name="REDIRECT_INPUT" value="false" />
+    <option name="INPUT_FILE" value="" />
+    <method v="2" />
+  </configuration>
+</component>
