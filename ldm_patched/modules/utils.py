@@ -5,6 +5,7 @@
 import torch
 import math
 import struct
+
 import ldm_patched.modules.checkpoint_pickle
 import safetensors.torch
 import numpy as np
@@ -422,11 +423,26 @@ def get_tiled_scale_steps(width, height, tile_x, tile_y, overlap):
 
 @dataclass
 class TilingData:
-    function: object
+    samples: torch.Tensor
+    sample_shape_0: int
+    sample_shape_2: int
+    sample_shape_3: int
+    function: callable
     tile_x: int
     tile_y: int
     overlap: int
     upscale_amount: int
+    out_channels: int
+    output_device: str
+    pbar: 'ProgressBar'
+    feather: float
+    inverted_feather: float
+
+    def update_progressbar(self, step):
+        if self.pbar is not None:
+            self.pbar.update(step)
+        pass
+
     pass
 
 
