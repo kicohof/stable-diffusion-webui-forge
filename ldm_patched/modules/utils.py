@@ -386,6 +386,7 @@ def bislerp(samples, width, height):
     result = result.reshape(n, h_new, w_new, c).movedim(-1, 1)
     return result.to(orig_dtype)
 
+
 def lanczos(samples, width, height):
     images = [Image.fromarray(np.clip(255. * image.movedim(0, -1).cpu().numpy(), 0, 255).astype(np.uint8)) for image in samples]
     images = [image.resize((width, height), resample=Image.Resampling.LANCZOS) for image in images]
@@ -393,28 +394,29 @@ def lanczos(samples, width, height):
     result = torch.stack(images)
     return result.to(samples.device, samples.dtype)
 
-def common_upscale(samples, width, height, upscale_method, crop):
-        if crop == "center":
-            old_width = samples.shape[3]
-            old_height = samples.shape[2]
-            old_aspect = old_width / old_height
-            new_aspect = width / height
-            x = 0
-            y = 0
-            if old_aspect > new_aspect:
-                x = round((old_width - old_width * (new_aspect / old_aspect)) / 2)
-            elif old_aspect < new_aspect:
-                y = round((old_height - old_height * (old_aspect / new_aspect)) / 2)
-            s = samples[:,:,y:old_height-y,x:old_width-x]
-        else:
-            s = samples
 
-        if upscale_method == "bislerp":
-            return bislerp(s, width, height)
-        elif upscale_method == "lanczos":
-            return lanczos(s, width, height)
-        else:
-            return torch.nn.functional.interpolate(s, size=(height, width), mode=upscale_method)
+def common_upscale(samples, width, height, upscale_method, crop):
+    if crop == "center":
+        old_width = samples.shape[3]
+        old_height = samples.shape[2]
+        old_aspect = old_width / old_height
+        new_aspect = width / height
+        x = 0
+        y = 0
+        if old_aspect > new_aspect:
+            x = round((old_width - old_width * (new_aspect / old_aspect)) / 2)
+        elif old_aspect < new_aspect:
+            y = round((old_height - old_height * (old_aspect / new_aspect)) / 2)
+        s = samples[:,:,y:old_height-y,x:old_width-x]
+    else:
+        s = samples
+
+    if upscale_method == "bislerp":
+        return bislerp(s, width, height)
+    elif upscale_method == "lanczos":
+        return lanczos(s, width, height)
+    else:
+        return torch.nn.functional.interpolate(s, size=(height, width), mode=upscale_method)
 
 
 def get_tiled_scale_steps(width, height, tile_x, tile_y, overlap):
