@@ -447,6 +447,18 @@ class TilingData:
 
     pass
 
+    def forward_samples(self, b):
+        self.samples = self.samples[b:b + 1]
+        return self.samples
+
+    def update_shapes(self):
+        self.sample_shape_0 = self.samples.shape[0]
+        self.sample_shape_2 = self.samples.shape[2]
+        self.sample_shape_3 = self.samples.shape[3]
+        return self.sample_shape_0, self.sample_shape_2, self.sample_shape_3
+
+    pass
+
 
 @torch.inference_mode()
 def tiled_scale(
@@ -503,26 +515,22 @@ def tiled_scale_step(b, tiling_data, output):
 
 def tiled_scale_step_(b, tiling_data):
 
-    sample = tiling_data.samples[b:b + 1]
-    sample_shape_0 = sample.shape[0]
-    sample_shape_2 = sample.shape[2]
-    sample_shape_3 = sample.shape[3]
-
+    tiling_data.forward_samples(b)
+    sample_shape_0, sample_shape_2, sample_shape_3 = tiling_data.update_shapes()
     upscale_width = round(sample_shape_2 * tiling_data.upscale_amount)
     upscale_height = round(sample_shape_3 * tiling_data.upscale_amount)
-    out = torch.zeros(
-        (sample_shape_0, tiling_data.out_channels, upscale_width, upscale_height),
-        device=tiling_data.output_device)
-    out_div = torch.zeros(
-        (sample_shape_0, tiling_data.out_channels, upscale_width, upscale_height),
-        device=tiling_data.output_device)
+
+    def out_dimensions():
+        return sample_shape_0, tiling_data.out_channels, upscale_width, upscale_height
+
+    out = torch.zeros((out_dimensions()), device=tiling_data.output_device)
+    out_div = torch.zeros((out_dimensions()), device=tiling_data.output_device)
 
     y_range = range(0, sample_shape_2, tiling_data.tile_y - tiling_data.overlap)
     x_range = range(0, sample_shape_3, tiling_data.tile_x - tiling_data.overlap)
     [scale_step(
         tiling_data,
         out, out_div,
-        sample,
         x, y) for y in y_range for x in x_range]
 
     return out, out_div
@@ -531,9 +539,9 @@ def tiled_scale_step_(b, tiling_data):
 def scale_step(
         tiling_data,
         out, out_div,
-        sample,
         x, y
 ):
+    sample = tiling_data.samples
     x = max(0, min(sample.shape[-1] - tiling_data.overlap, x))
     y = max(0, min(sample.shape[-2] - tiling_data.overlap, y))
     s_in = sample[:, :, y:y + tiling_data.tile_y, x:x + tiling_data.tile_x]
