@@ -537,9 +537,16 @@ def scale_step(
     s_in = sample[:, :, y:y + tiling_data.tile_y, x:x + tiling_data.tile_x]
     ps = tiling_data.function(s_in).to(tiling_data.output_device)
     mask = torch.ones_like(ps)
+    mask_shape_2 = mask.shape[2]
+    mask_shape_3 = mask.shape[3]
 
-    [mask_step((tiling_data.inverted_feather * (t + 1)), mask, t)
-     for t in range(tiling_data.feather)]
+    [mask_step(
+        (tiling_data.inverted_feather * (t + 1)),
+        mask,
+        mask_shape_2,
+        mask_shape_3,
+        t
+    ) for t in range(tiling_data.feather)]
 
     y_scale = round(y * tiling_data.upscale_amount)
     y_tile_scale = round((y + tiling_data.tile_y) * tiling_data.upscale_amount)
@@ -553,15 +560,15 @@ def scale_step(
     pass
 
 
-def mask_step(feather_ratio, mask, t):
-
-    mask_shape_2 = mask.shape[2]
-    mask_shape_3 = mask.shape[3]
-
+def mask_step(
+        feather_ratio,
+        mask,
+        mask_shape_2,
+        mask_shape_3,
+        t
+):
     mask[:, :, t:(t + 1), t:(t + 1)] *= feather_ratio
-    mask[:, :, mask_shape_2 - 1 - t: mask_shape_2 - t, :] *= feather_ratio
-    mask[:, :, :, mask_shape_3 - 1 - t: mask_shape_3 - t] *= feather_ratio
-
+    mask[:, :, mask_shape_2 - 1 - t: mask_shape_2 - t, mask_shape_3 - 1 - t: mask_shape_3 - t] *= feather_ratio
     pass
 
 
