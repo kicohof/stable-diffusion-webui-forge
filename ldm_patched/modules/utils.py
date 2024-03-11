@@ -12,6 +12,7 @@ import numpy as np
 
 from PIL import Image
 from tqdm import tqdm
+from collections import deque
 from dataclasses import dataclass
 
 
@@ -457,7 +458,21 @@ class TilingData:
         self.sample_shape_3 = self.samples.shape[3]
         return self.sample_shape_0, self.sample_shape_2, self.sample_shape_3
 
+    def out_dimensions(self):
+        upscale_width = round(self.sample_shape_2 * self.upscale_amount)
+        upscale_height = round(self.sample_shape_3 * self.upscale_amount)
+        return self.sample_shape_0, self.out_channels, upscale_width, upscale_height
+
+    def x_y_ranges(self):
+        y_range = range(0, self.sample_shape_2, self.tile_y - self.overlap)
+        x_range = range(0, self.sample_shape_3, self.tile_x - self.overlap)
+        return x_range, y_range
+
     pass
+
+
+def exhaust(generator):
+    deque(generator, maxlen=0)
 
 
 @torch.inference_mode()
@@ -501,8 +516,8 @@ def tiled_scale(
         inverted_feather=inverted_feather
     )
 
-    [tiled_scale_step(b, tiling_data, output)
-     for b in range(tiling_data.sample_shape_0)]
+    exhaust((tiled_scale_step(b, tiling_data, output)
+             for b in range(tiling_data.sample_shape_0)))
 
     return output
 
@@ -516,22 +531,13 @@ def tiled_scale_step(b, tiling_data, output):
 def tiled_scale_step_(b, tiling_data):
 
     tiling_data.forward_samples(b)
-    sample_shape_0, sample_shape_2, sample_shape_3 = tiling_data.update_shapes()
-    upscale_width = round(sample_shape_2 * tiling_data.upscale_amount)
-    upscale_height = round(sample_shape_3 * tiling_data.upscale_amount)
+    tiling_data.update_shapes()
+    out = torch.zeros((tiling_data.out_dimensions()), device=tiling_data.output_device)
+    out_div = torch.zeros((tiling_data.out_dimensions()), device=tiling_data.output_device)
 
-    def out_dimensions():
-        return sample_shape_0, tiling_data.out_channels, upscale_width, upscale_height
-
-    out = torch.zeros((out_dimensions()), device=tiling_data.output_device)
-    out_div = torch.zeros((out_dimensions()), device=tiling_data.output_device)
-
-    y_range = range(0, sample_shape_2, tiling_data.tile_y - tiling_data.overlap)
-    x_range = range(0, sample_shape_3, tiling_data.tile_x - tiling_data.overlap)
-    [scale_step(
-        tiling_data,
-        out, out_div,
-        x, y) for y in y_range for x in x_range]
+    x_range, y_range = tiling_data.x_y_ranges()
+    exhaust((scale_step(tiling_data, out, out_div, x, y)
+             for y in y_range for x in x_range))
 
     return out, out_div
 
@@ -550,13 +556,13 @@ def scale_step(
     mask_shape_2 = mask.shape[2]
     mask_shape_3 = mask.shape[3]
 
-    [mask_step(
+    exhaust((mask_step(
         (tiling_data.inverted_feather * (t + 1)),
         mask,
         mask_shape_2,
         mask_shape_3,
         t
-    ) for t in range(tiling_data.feather)]
+    ) for t in range(tiling_data.feather)))
 
     y_scale = round(y * tiling_data.upscale_amount)
     y_tile_scale = round((y + tiling_data.tile_y) * tiling_data.upscale_amount)
