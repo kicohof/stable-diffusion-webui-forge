@@ -541,11 +541,7 @@ def tiled_scale_step_(b, tiling_data):
     overlap_x, overlap_y = sample.shape[-1] - tiling_data.overlap, sample.shape[-2] - tiling_data.overlap
 
     exhaust(
-        (scale_step(
-            tiling_data,
-            out, out_div,
-            overlap_x, overlap_y,
-            x, y)
+        (scale_step(tiling_data, out, out_div, overlap_x, overlap_y, x, y)
          for y, x in itertools.product(*tiling_data.x_y_ranges()))
     )
 
@@ -556,12 +552,12 @@ def scale_step(
         tiling_data,
         out, out_div,
         overlap_x, overlap_y,
-        x, y
+        x_coord, y_coord
 ):
-    x, y = max(0, min(overlap_x, x)), max(0, min(overlap_y, y))
-    s_in = tiling_data.samples[:, :, y:y + tiling_data.tile_y, x:x + tiling_data.tile_x]
-    ps = tiling_data.decode_function(s_in).to(tiling_data.output_device)
-    mask = torch.ones_like(ps)
+    x, y = max(0, min(overlap_x, x_coord)), max(0, min(overlap_y, y_coord))
+    sample_input = tiling_data.samples[:, :, y:y+tiling_data.tile_y, x:x+tiling_data.tile_x]
+    decoded_sample = tiling_data.decode_function(sample_input).to(tiling_data.output_device)
+    mask = torch.ones_like(decoded_sample)  # (1, 3, 192, 192), (1, 3, 192, 512), (1, 3, 512, 192), (1, 3, 512, 512)
 
     exhaust(
         (mask_step((tiling_data.inverted_feather * (t + 1)), mask, mask.shape[2], mask.shape[3], t)
@@ -572,7 +568,7 @@ def scale_step(
     y_tile_scale, x_tile_scale = tiling_data.tile_scale(y, tiling_data.tile_y), \
         tiling_data.tile_scale(x, tiling_data.tile_x)
 
-    out[:, :, y_scale:y_tile_scale, x_scale:x_tile_scale] += ps * mask
+    out[:, :, y_scale:y_tile_scale, x_scale:x_tile_scale] += decoded_sample * mask
     out_div[:, :, y_scale:y_tile_scale, x_scale:x_tile_scale] += mask
 
     tiling_data.update_progressbar(1)
