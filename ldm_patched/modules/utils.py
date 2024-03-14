@@ -579,15 +579,11 @@ def scale_step(
     pass
 
 
-def mask_step(
-        feather_ratio,
-        mask,
-        mask_shape_2,
-        mask_shape_3,
-        t
-):
-    mask[:, :, t:(t + 1), t:(t + 1)] *= feather_ratio
-    mask[:, :, mask_shape_2 - 1 - t: mask_shape_2 - t, mask_shape_3 - 1 - t: mask_shape_3 - t] *= feather_ratio
+def mask_step(feather_ratio, mask, width, height, t):
+    mask[:, :, t:t+1, :] *= feather_ratio
+    mask[:, :, :, t:t+1] *= feather_ratio
+    mask[:, :, width - 1 - t:width - t, :] *= feather_ratio
+    mask[:, :, :, height - 1 - t:height - t] *= feather_ratio
     pass
 
 
