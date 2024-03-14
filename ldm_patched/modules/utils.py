@@ -478,7 +478,7 @@ class TilingData:
 
 
 def exhaust(generator):
-    deque(generator, maxlen=0)
+    any(generator)
 
 
 @torch.inference_mode()
