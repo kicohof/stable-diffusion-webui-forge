@@ -14,6 +14,7 @@ from PIL import Image
 from tqdm import tqdm
 from functools import cache
 from dataclasses import dataclass
+from ldm_patched.modules.tiled_upscale import mask_step_initial
 
 
 def load_torch_file(ckpt, safe_load=False, device=None):
@@ -439,7 +440,6 @@ class TilingData:
     output_device: str
     pbar: 'ProgressBar'
     feather: float
-    inverted_feather: float
 
     def update_progressbar(self, step):
         if self.pbar is not None:
@@ -494,7 +494,6 @@ def tiled_scale(
 
     sample_shape_0, sample_shape_2, sample_shape_3 = samples.shape[0], samples.shape[2], samples.shape[3]
     feather = round(overlap * upscale_amount)
-    inverted_feather = (1.0 / feather)
 
     tiling_data = TilingData(
         samples=samples,
@@ -510,7 +509,6 @@ def tiled_scale(
         output_device=output_device,
         pbar=pbar,
         feather=feather,
-        inverted_feather=inverted_feather
     )
 
     output = torch.empty(tiling_data.out_dimensions(), device=output_device)
@@ -553,32 +551,49 @@ def scale_step(
         overlap_x, overlap_y,
         x_coord, y_coord
 ):
+    # Ensure x and y coordinates are within the overlap limits
     x, y = max(0, min(overlap_x, x_coord)), max(0, min(overlap_y, y_coord))
+
+    # Extract the sample data based on coordinates
     sample_input = tiling_data.samples[:, :, y:y+tiling_data.tile_y, x:x+tiling_data.tile_x]
+
+    # Decode the sample input and move it to the output device
     decoded_sample = tiling_data.decode_function(sample_input).to(tiling_data.output_device)
+
+    # Create a mask with ones similar to the shape of the decoded sample
     mask = torch.ones_like(decoded_sample)  # (1, 3, 192, 192), (1, 3, 192, 512), (1, 3, 512, 192), (1, 3, 512, 512)
 
-    exhaust(
-        (mask_step((tiling_data.inverted_feather * (t + 1)), mask, mask.shape[2], mask.shape[3], t)
-         for t in range(tiling_data.feather))
-    )
+    # Apply the mask step
+    mask_step(tiling_data.feather, mask)
 
+    # mask_1 = torch.ones_like(decoded_sample)
+    # mask_step_initial(tiling_data.feather, mask_1)
+    # assert torch.allclose(mask, mask_1)
+
+    # Calculate scales for y and x
     y_scale, x_scale = tiling_data.scale(y), tiling_data.scale(x)
     y_tile_scale, x_tile_scale = tiling_data.tile_scale(y, tiling_data.tile_y), \
         tiling_data.tile_scale(x, tiling_data.tile_x)
 
+    # Update the output and output division with the processed sample and mask
     out[:, :, y_scale:y_tile_scale, x_scale:x_tile_scale] += decoded_sample * mask
     out_div[:, :, y_scale:y_tile_scale, x_scale:x_tile_scale] += mask
 
+    # Update the progress bar
     tiling_data.update_progressbar(1)
     pass
 
 
-def mask_step(feather_ratio, mask, width, height, t):
-    mask[:, :, t:t+1, :] *= feather_ratio
-    mask[:, :, :, t:t+1] *= feather_ratio
-    mask[:, :, width - 1 - t:width - t, :] *= feather_ratio
-    mask[:, :, :, height - 1 - t:height - t] *= feather_ratio
+def mask_step(feather: int, mask: torch.Tensor) -> None:
+    width, height = mask.shape[2], mask.shape[3]
+    feather_ratio = (1.0 / feather) * (torch.arange(feather).float() + 1)
+    view_1_1_minus_1_1 = 1, 1, -1, 1
+    view_1_1_1_minus_1 = 1, 1, 1, -1
+
+    mask[:, :, :feather, :] *= feather_ratio.view(view_1_1_minus_1_1)
+    mask[:, :, :, :feather] *= feather_ratio.view(view_1_1_1_minus_1)
+    mask[:, :, width-feather:, :] *= feather_ratio.flip(0).view(view_1_1_minus_1_1)
+    mask[:, :, :, height-feather:] *= feather_ratio.flip(0).view(view_1_1_1_minus_1)
     pass
 
 
