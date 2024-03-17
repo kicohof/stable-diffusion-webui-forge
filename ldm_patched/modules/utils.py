@@ -13,7 +13,6 @@ import ldm_patched.modules.checkpoint_pickle
 from PIL import Image
 from tqdm import tqdm
 from functools import cache
-from collections import deque
 from dataclasses import dataclass
 
 
