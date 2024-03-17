@@ -2,6 +2,33 @@ import numpy as np
 import torch
 
 
+def test_vector_slicing():
+    k = torch.Tensor([2, 3, 3])
+    t = torch.Tensor([[1, 1, 1],
+                      [2, 2, 2],
+                      [3, 3, 3]])
+
+    h, w = t.shape
+
+    # create a mask of ones with size h, w+1
+    mask = torch.ones(h, w + 1)
+
+    # set other elements to 0, depending on length of each row
+    mask[torch.arange(h), k.long()] = 0.
+    mask = mask.cumprod(dim=1)
+
+    # multiply the mask
+    actual = t * mask[:, :-1]
+    print()
+    print(actual)
+    expected = torch.Tensor([[1., 0., 0.],
+                             [2., 2., 2.],
+                             [3., 3., 0.]])
+
+    assert torch.allclose(actual, expected)
+    pass
+
+
 def test_diagonal():
 
     feather = 4
