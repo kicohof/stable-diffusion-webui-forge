@@ -431,11 +431,15 @@ def tiled_scale(samples, function, tile_x=64, tile_y=64, overlap = 8, upscale_am
                 ps = function(s_in).to(output_device)
                 mask = torch.ones_like(ps)
                 feather = round(overlap * upscale_amount)
-                for t in range(feather):
-                        mask[:,:,t:1+t,:] *= ((1.0/feather) * (t + 1))
-                        mask[:,:,mask.shape[2] -1 -t: mask.shape[2]-t,:] *= ((1.0/feather) * (t + 1))
-                        mask[:,:,:,t:1+t] *= ((1.0/feather) * (t + 1))
-                        mask[:,:,:,mask.shape[3]- 1 - t: mask.shape[3]- t] *= ((1.0/feather) * (t + 1))
+                width, height = mask.shape[2], mask.shape[3]
+                feather_ratio = (1.0 / feather) * (torch.arange(feather).float() + 1)
+                view_1_1_minus_1_1 = 1, 1, -1, 1
+                view_1_1_1_minus_1 = 1, 1, 1, -1
+                mask[:, :, :feather, :] *= feather_ratio.view(view_1_1_minus_1_1)
+                mask[:, :, :, :feather] *= feather_ratio.view(view_1_1_1_minus_1)
+                mask[:, :, width - feather:, :] *= feather_ratio.flip(0).view(view_1_1_minus_1_1)
+                mask[:, :, :, height - feather:] *= feather_ratio.flip(0).view(view_1_1_1_minus_1)
+
                 out[:,:,round(y*upscale_amount):round((y+tile_y)*upscale_amount),round(x*upscale_amount):round((x+tile_x)*upscale_amount)] += ps * mask
                 out_div[:,:,round(y*upscale_amount):round((y+tile_y)*upscale_amount),round(x*upscale_amount):round((x+tile_x)*upscale_amount)] += mask
                 if pbar is not None:
